@@ -6,5 +6,5 @@ export async function loader() {
 }
 
 export default function Catch() {
-    return <></>
+    return <div></div>
 }

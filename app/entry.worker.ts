@@ -1,5 +1,4 @@
 /// <reference lib="WebWorker" />
-
 import { registerRoute, setDefaultHandler } from "workbox-routing";
 import { CacheFirst, NetworkFirst, Strategy } from "workbox-strategies";
 import type { StrategyHandler } from "workbox-strategies";
@@ -52,6 +51,8 @@ class NetworkFirstLoader extends Strategy {
               cachedResponse.headers.set('X-Remix-Worker', 'yes')
               resolve(cachedResponse);
             }
+
+            console.log("Error, I guess", "Network First Loader")
 
             const headers = new Headers();
             headers.set("Content-Type", "application/json; charset=utf-8");
@@ -118,26 +119,34 @@ function matchAssetRequest({ request }: WBProps) {
 }
 
 function matchDocumentRequest({ request }: WBProps) {
+  const url = new URL(request.url);
+  console.log(url.searchParams)
   return isMethod(request, ["get"]) && request.mode === "navigate";
 }
 
 function matchLoaderRequest({ request }: WBProps) {
   const url = new URL(request.url);
+  console.log(url.searchParams)
   return isMethod(request, ["get"]) && url.searchParams.get("_data");
 }
 
 // Assets
-registerRoute(matchAssetRequest, new CacheFirst());
+registerRoute(matchAssetRequest, new CacheFirst({
+  cacheName: "assets",
+}));
 
 // Loaders
-registerRoute(matchLoaderRequest, new NetworkFirstLoader());
+registerRoute(matchLoaderRequest, new NetworkFirstLoader({
+  cacheName: "data",
+}));
 
 // Documents
-registerRoute(matchDocumentRequest, new NetworkFirst());
+registerRoute(matchDocumentRequest, new NetworkFirst({
+  cacheName: "pages",
+}));
 
 setDefaultHandler(({ request, url }) => {
-  console.log(request)
-  console.log(url)
+  // console.log(request)
 
   return fetch(request.clone())
 })
@@ -153,6 +162,10 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(handleActivate(event).then(() => self.clients.claim()));
 });
+
+self.addEventListener("fetch", (event) => {
+  console.warn(event.request)
+})
 
 // self.addEventListener("message", (event) => {
 //     event.waitUntil(handleMessage(event));

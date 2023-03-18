@@ -1325,6 +1325,7 @@
               cachedResponse.headers.set("X-Remix-Worker", "yes");
               resolve(cachedResponse);
             }
+            console.log("Error, I guess", "Network First Loader");
             const headers = new Headers();
             headers.set("Content-Type", "application/json; charset=utf-8");
             headers.set("X-Remix-Catch", "yes");
@@ -1360,19 +1361,66 @@
     );
   }
   function matchDocumentRequest({ request }) {
+    const url = new URL(request.url);
+    console.log(url.searchParams);
     return isMethod(request, ["get"]) && request.mode === "navigate";
   }
   function matchLoaderRequest({ request }) {
     const url = new URL(request.url);
+    console.log(url.searchParams);
     return isMethod(request, ["get"]) && url.searchParams.get("_data");
   }
-  registerRoute(matchAssetRequest, new CacheFirst());
-  registerRoute(matchLoaderRequest, new NetworkFirstLoader());
-  registerRoute(matchDocumentRequest, new NetworkFirst());
+  registerRoute(matchAssetRequest, new CacheFirst({
+    cacheName: "assets"
+  }));
+  registerRoute(matchLoaderRequest, new NetworkFirstLoader({
+    cacheName: "data"
+  }));
+  registerRoute(matchDocumentRequest, new NetworkFirst({
+    cacheName: "pages"
+  }));
+  async function handleMessage(event) {
+    const cachePromises = /* @__PURE__ */ new Map();
+    if (event.data.type === "REMIX_NAVIGATION") {
+      const { isMount, location: location2, matches, manifest } = event.data;
+      const documentUrl = location2.pathname + location2.search + location2.hash;
+      const [dataCache, documentCache, existingDocument] = await Promise.all([
+        caches.open("data"),
+        caches.open("pages"),
+        caches.match(documentUrl)
+      ]);
+      if (!existingDocument || !isMount) {
+        cachePromises.set(
+          documentUrl,
+          documentCache.add(documentUrl).catch((error) => {
+            debug(`Failed to cache document for ${documentUrl}:`, error);
+          })
+        );
+      }
+      if (isMount) {
+        for (const match of matches) {
+          if (manifest.routes[match.id].hasLoader) {
+            const params = new URLSearchParams(location2.search);
+            params.set("_data", match.id);
+            let search = params.toString();
+            search = search ? `?${search}` : "";
+            const url = location2.pathname + search + location2.hash;
+            if (!cachePromises.has(url)) {
+              cachePromises.set(
+                url,
+                dataCache.add(url).catch((error) => {
+                  debug(`Failed to cache data for ${url}:`, error);
+                })
+              );
+            }
+          }
+        }
+      }
+    }
+    await Promise.all(cachePromises.values());
+  }
   setDefaultHandler(({ request, url }) => {
-    console.log(request);
-    console.log(url);
-    return Promise.resolve(new Response(JSON.stringify({ foo: "bar" }), { status: 200 }));
+    return fetch(request.clone());
   });
   function isMethod(request, methods) {
     return methods.includes(request.method.toLowerCase());
@@ -1382,5 +1430,11 @@
   });
   self.addEventListener("activate", (event) => {
     event.waitUntil(handleActivate(event).then(() => self.clients.claim()));
+  });
+  self.addEventListener("fetch", (event) => {
+    console.warn(event.request);
+  });
+  self.addEventListener("message", (event) => {
+    event.waitUntil(handleMessage(event));
   });
 })();

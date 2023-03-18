@@ -20,8 +20,6 @@ export const meta: MetaFunction = () => ({
   viewport: "width=device-width,initial-scale=1",
 });
 
-let isMount = true;
-
 export default function App() {
   // let location = useLocation();
   // let matches = useMatches();
@@ -34,9 +32,11 @@ export default function App() {
   //   return false;
   // }
 
+  // const isMount = React.useRef<boolean>(true);
+
   // React.useEffect(() => {
-  //   let mounted = isMount;
-  //   isMount = false;
+  //   let mounted = isMount.current;
+  //   isMount.current = false;
 
   //   if ("serviceWorker" in navigator) {
   //     if (navigator.serviceWorker.controller) {
@@ -78,10 +78,7 @@ export default function App() {
   //       };
   //       navigator.serviceWorker.addEventListener("controllerchange", listener);
   //       return () => {
-  //         navigator.serviceWorker.removeEventListener(
-  //           "controllerchange",
-  //           listener
-  //         );
+  //         navigator.serviceWorker.removeEventListener("controllerchange", listener);
   //       };
   //     }
   //   }
@@ -192,7 +189,7 @@ export function CatchBoundary() {
   </div>
 }
 
-export function ErrorBoundary({ error }: { error: any}) {
+export function ErrorBoundary({ error }: { error: any }) {
   console.log(error)
   return <div>
     <h1>{error.message}</h1>

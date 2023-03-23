@@ -7,8 +7,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
-  useLocation,
-  useMatches,
+  Link,
   useCatch
 } from "@remix-run/react";
 
@@ -186,6 +185,7 @@ export function CatchBoundary() {
   return <div>
     <h1>Something Went Wrong</h1>
     <h2>Server responded with {caught.status} {caught.statusText} {caught.data.message}</h2>
+    <Link to='/'>Goto Home</Link>
   </div>
 }
 

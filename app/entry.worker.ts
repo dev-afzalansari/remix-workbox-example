@@ -1,81 +1,17 @@
 /// <reference lib="WebWorker" />
 import { registerRoute, setDefaultHandler } from "workbox-routing";
-import { CacheFirst, NetworkFirst, Strategy } from "workbox-strategies";
-import type { StrategyHandler } from "workbox-strategies";
+import { CacheFirst, NetworkFirst } from "workbox-strategies";
+import { BackgroundSyncPlugin } from "workbox-background-sync";
 
-// import {
-//   CachedResponseWillBeUsedCallback,
-//   HandlerDidErrorCallback,
-//   CachedResponseWillBeUsedCallbackParam,
-//   RouteHandlerCallbackOptions,
-// } from "workbox-core/types";
+import {
+  CachedResponseWillBeUsedCallback,
+  HandlerDidErrorCallback,
+  CachedResponseWillBeUsedCallbackParam,
+  FetchDidSucceedCallback,
+  FetchDidSucceedCallbackParam
+} from "workbox-core/types";
 
-/* Plugins & Strategies */
-
-// Loader Plugin
-// const remixLoaderPlugin: RemixLoaderPlugin = {
-//   cachedResponseWillBeUsed: async ({
-//     cachedResponse,
-//   }: CachedResponseWillBeUsedCallbackParam) => {
-//     cachedResponse?.headers.set("X-Remix-Worker", "yes");
-//     return cachedResponse;
-//   },
-//   handlerDidError: async () => {
-//     console.log("handler error");
-//     return new Response(JSON.stringify({ message: "Network Error" }), {
-//       status: 500,
-//       statusText: "Internal Server Error",
-//       headers: {
-//         "Content-Type": "application/json; charset=utf-8",
-//         "X-Remix-Catch": "yes",
-//         "X-Remix-Worker": "yes",
-//       },
-//     });
-//   },
-// };
-
-
-// Loader Strategy
-class NetworkFirstLoader extends Strategy {
-  _handle(request: Request, handler: StrategyHandler): Promise<Response> {
-    const networkRequest = handler.fetchAndCachePut(request);
-
-    return new Promise((resolve) => {
-      networkRequest
-        .then((networkResponse) => resolve(networkResponse))
-        .catch((_err) => {
-          const cacheMatch = handler.cacheMatch(request);
-
-          cacheMatch.then((cachedResponse) => {
-            if (cachedResponse) {
-              cachedResponse.headers.set('X-Remix-Worker', 'yes')
-              resolve(cachedResponse);
-            }
-
-            console.log("Error, I guess", "Network First Loader")
-
-            const headers = new Headers();
-            headers.set("Content-Type", "application/json; charset=utf-8");
-            headers.set("X-Remix-Catch", "yes");
-            headers.set("X-Remix-Worker", "yes");
-
-            const errorResponse = new Response(
-              JSON.stringify({ message: "Network Error" }),
-              {
-                status: 500,
-                statusText: "Internal Server Error",
-                headers,
-              }
-            );
-
-            resolve(errorResponse);
-          });
-        })
-    });
-  }
-}
-
-//////////////////////////
+declare let self: ServiceWorkerGlobalScope;
 
 type WBProps = {
   url: URL;
@@ -83,16 +19,46 @@ type WBProps = {
   event: Event;
 };
 
-// type RemixLoaderPlugin = {
-//   cachedResponseWillBeUsed: CachedResponseWillBeUsedCallback;
-//   handlerDidError: HandlerDidErrorCallback;
-// };
+/* Plugins */
 
-// type RemixDocumentPlugin = {
-//   handlerDidError: HandlerDidErrorCallback;
-// };
+type RemixLoaderPlugin = {
+  cachedResponseWillBeUsed: CachedResponseWillBeUsedCallback;
+  handlerDidError: HandlerDidErrorCallback;
+  fetchDidSucceed: FetchDidSucceedCallback;
+};
 
-declare let self: ServiceWorkerGlobalScope;
+// Loader Plugin
+const remixLoaderPlugin: RemixLoaderPlugin = {
+  fetchDidSucceed: async ({ response }: FetchDidSucceedCallbackParam) => {
+    // @ts-ignore
+    console.log('manifest', self.__remixManifest)
+    return response
+  },
+  cachedResponseWillBeUsed: async ({
+    cachedResponse,
+  }: CachedResponseWillBeUsedCallbackParam) => {
+    cachedResponse?.headers.set("X-Remix-Worker", "yes");
+    return cachedResponse;
+  },
+  handlerDidError: async () => {
+    return new Response(JSON.stringify({ message: "Network Error" }), {
+      status: 500,
+      statusText: "Internal Server Error",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Remix-Catch": "yes",
+        "X-Remix-Worker": "yes",
+      },
+    });
+  },
+};
+
+const backgroundSyncPlugin = new BackgroundSyncPlugin('loaderQueue', {
+  maxRetentionTime: 2
+})
+
+//////////////////////////
+
 
 function debug(...messages: any[]) {
   if (process.env.NODE_ENV === "development") {
@@ -119,14 +85,11 @@ function matchAssetRequest({ request }: WBProps) {
 }
 
 function matchDocumentRequest({ request }: WBProps) {
-  const url = new URL(request.url);
-  console.log(url.searchParams)
   return isMethod(request, ["get"]) && request.mode === "navigate";
 }
 
 function matchLoaderRequest({ request }: WBProps) {
   const url = new URL(request.url);
-  console.log(url.searchParams)
   return isMethod(request, ["get"]) && url.searchParams.get("_data");
 }
 
@@ -136,8 +99,9 @@ registerRoute(matchAssetRequest, new CacheFirst({
 }));
 
 // Loaders
-registerRoute(matchLoaderRequest, new NetworkFirstLoader({
+registerRoute(matchLoaderRequest, new NetworkFirst({
   cacheName: "data",
+  plugins: [backgroundSyncPlugin, remixLoaderPlugin]
 }));
 
 // Documents
@@ -146,8 +110,6 @@ registerRoute(matchDocumentRequest, new NetworkFirst({
 }));
 
 setDefaultHandler(({ request, url }) => {
-  // console.log(request)
-
   return fetch(request.clone())
 })
 
@@ -162,11 +124,3 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(handleActivate(event).then(() => self.clients.claim()));
 });
-
-self.addEventListener("fetch", (event) => {
-  console.warn(event.request)
-})
-
-// self.addEventListener("message", (event) => {
-//     event.waitUntil(handleMessage(event));
-// });

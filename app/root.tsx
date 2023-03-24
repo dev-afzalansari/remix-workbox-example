@@ -12,6 +12,7 @@ import {
 } from "@remix-run/react";
 
 import styles from "./styles/index.css";
+import { useSWEffect } from "./utils/client/sw-hook";
 
 export const meta: MetaFunction = () => ({
   charset: "utf-8",
@@ -20,68 +21,8 @@ export const meta: MetaFunction = () => ({
 });
 
 export default function App() {
-  // let location = useLocation();
-  // let matches = useMatches();
 
-  // function isPromise(p: any): boolean {
-  //   if (typeof p === "object" && typeof p.then === "function") {
-  //     return true;
-  //   }
-
-  //   return false;
-  // }
-
-  // const isMount = React.useRef<boolean>(true);
-
-  // React.useEffect(() => {
-  //   let mounted = isMount.current;
-  //   isMount.current = false;
-
-  //   if ("serviceWorker" in navigator) {
-  //     if (navigator.serviceWorker.controller) {
-  //       navigator.serviceWorker.controller?.postMessage({
-  //         type: "REMIX_NAVIGATION",
-  //         isMount: mounted,
-  //         location,
-  //         matches: matches.filter((route) => {
-  //           if (route.data) {
-  //             return (
-  //               Object.values(route.data!).filter((elem) => {
-  //                 return isPromise(elem);
-  //               }).length === 0
-  //             );
-  //           }
-  //           return true;
-  //         }),
-  //         manifest: window.__remixManifest,
-  //       });
-  //     } else {
-  //       let listener = async () => {
-  //         await navigator.serviceWorker.ready;
-  //         navigator.serviceWorker.controller?.postMessage({
-  //           type: "REMIX_NAVIGATION",
-  //           isMount: mounted,
-  //           location,
-  //           matches: matches.filter((route) => {
-  //             if (route.data) {
-  //               return (
-  //                 Object.values(route.data!).filter((elem) => {
-  //                   return isPromise(elem);
-  //                 }).length === 0
-  //               );
-  //             }
-  //             return true;
-  //           }),
-  //           manifest: window.__remixManifest,
-  //         });
-  //       };
-  //       navigator.serviceWorker.addEventListener("controllerchange", listener);
-  //       return () => {
-  //         navigator.serviceWorker.removeEventListener("controllerchange", listener);
-  //       };
-  //     }
-  //   }
-  // }, [location, matches]);
+  useSWEffect()
 
   return (
     <html lang="en">

@@ -1,1 +1,1 @@
-# WIP
+# Remix Workbox Example
